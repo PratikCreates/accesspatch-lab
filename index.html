@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172b3a">
+  <title>AccessPatch — keyboard repair workbench</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workbench</a>
+  <header class="topbar">
+    <a class="brand" href="#main" aria-label="AccessPatch home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M16 3.5 27 8v7.4c0 7.2-4.4 11.4-11 13.1C10.4 26.8 6 22.6 6 15.4V8l10-4.5Z" stroke="currentColor" stroke-width="1.8"/><path d="m11.5 16.1 3 3 6.2-6.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="brand-name">Access<span>Patch</span></span>
+    </a>
+    <div class="topbar-meta">
+      <span class="scope-pill"><span class="scope-dot" aria-hidden="true"></span>SYNTHETIC FIXTURE</span>
+      <span class="api-state" id="api-state" role="status"><span class="state-dot" aria-hidden="true"></span><span id="api-state-text">Connecting…</span></span>
+    </div>
+  </header>
+
+  <main id="main" class="page-shell">
+    <section class="intro" aria-labelledby="page-title">
+      <div class="intro-copy">
+        <p class="eyebrow"><span class="eyebrow-rule"></span>ACCESSIBILITY REPAIR WORKBENCH</p>
+        <h1 id="page-title">Make the next key<br class="desktop-break"> take you somewhere.</h1>
+        <p class="intro-lede">Start with a controlled fixture, or bring one trusted HTML file. Review bounded repair options, then compare real keyboard behavior before and after.</p>
+      </div>
+      <div class="scope-note">
+        <span class="scope-note-icon" aria-hidden="true">⌘</span>
+        <div><strong>Your call at every step</strong><span>Separate consent for model review and local code execution.</span></div>
+      </div>
+    </section>
+
+    <nav class="workflow" aria-label="Workbench steps">
+      <div class="workflow-step is-current" id="step-inspect"><span class="step-number">01</span><span><strong>Inspect</strong><small>Observe the fixture</small></span><span class="step-state" aria-hidden="true">●</span></div>
+      <span class="workflow-connector" aria-hidden="true"></span>
+      <div class="workflow-step" id="step-propose"><span class="step-number">02</span><span><strong>Choose</strong><small>Review repair options</small></span><span class="step-state" aria-hidden="true">○</span></div>
+      <span class="workflow-connector" aria-hidden="true"></span>
+      <div class="workflow-step" id="step-verify"><span class="step-number">03</span><span><strong>Verify</strong><small>Compare observed results</small></span><span class="step-state" aria-hidden="true">○</span></div>
+    </nav>
+
+    <div id="global-message" class="global-message" hidden role="alert"></div>
+
+    <div class="workspace-grid">
+      <div class="evidence-column">
+        <section class="panel fixture-panel" aria-labelledby="fixture-heading" aria-busy="true" id="fixture-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker"><span class="kicker-index">A</span> BASELINE EVIDENCE</p>
+              <h2 id="fixture-heading">Fixture under test</h2>
+            </div>
+            <span class="source-badge"><span class="source-icon" aria-hidden="true">◉</span> Browser observed</span>
+          </div>
+          <div class="fixture-identity">
+            <div class="fixture-glyph" aria-hidden="true"><span>↵</span><i></i><i></i><i></i></div>
+            <div class="fixture-title-wrap">
+              <h3 id="fixture-title"><span class="skeleton skeleton-title"></span></h3>
+              <p id="fixture-description" class="fixture-description"><span class="skeleton skeleton-copy"></span></p>
+            </div>
+          </div>
+          <div class="evidence-divider"></div>
+          <div class="subheading-row">
+            <div><h3 class="subheading">Current checks</h3><p class="muted" id="baseline-summary">Waiting for fixture evidence…</p></div>
+            <span class="mini-label">AS OBSERVED</span>
+          </div>
+          <div id="baseline-checks" class="check-list" aria-live="polite">
+            <div class="loading-line"><span class="spinner" aria-hidden="true"></span> Loading browser checks…</div>
+          </div>
+          <div class="trace-section">
+            <div class="subheading-row trace-heading"><div><h3 class="subheading">Keyboard focus trace</h3><p class="muted">Tab sequence captured in the fixture browser</p></div><span class="trace-key" aria-hidden="true">TAB ↹</span></div>
+            <div class="trace-rail" id="baseline-trace" aria-label="Baseline keyboard focus trace">
+              <div class="trace-empty">The observed focus path will appear here.</div>
+            </div>
+            <p class="trace-note">Focused element is browser-observed; the displayed role and name are DOM-based approximations, not platform accessibility-tree values.</p>
+          </div>
+          <details class="source-details">
+            <summary><span class="summary-chevron" aria-hidden="true">›</span> View bundled fixture source</summary>
+            <div class="source-caption">Read-only source supplied by the controlled fixture.</div>
+            <pre class="code-block"><code id="fixture-source">Source loads with the fixture.</code></pre>
+          </details>
+        </section>
+
+        <section class="panel method-panel" aria-labelledby="method-heading">
+          <div class="method-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5h16M4 12h10M4 17.5h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="18" cy="16" r="3.3" stroke="currentColor" stroke-width="1.7"/><path d="m17 16 0.7.7 1.4-1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><h2 id="method-heading">What this run can tell you</h2><p>It records behavior and checks for this bundled case. A passing fixture is evidence about this case only; it is not a site-wide accessibility audit.</p></div>
+        </section>
+      </div>
+
+      <aside class="planner-column" aria-label="Repair planning">
+        <section class="panel planner-panel" aria-labelledby="planner-heading">
+          <div class="panel-heading planner-title-row">
+            <div><p class="section-kicker"><span class="kicker-index">B</span> REPAIR OPTIONS</p><h2 id="planner-heading">Choose a repair</h2></div>
+            <span class="model-mark" aria-label="Model assisted">N</span>
+          </div>
+          <p class="planner-intro">Ask the model for options from a fixed set of semantic edits. Nothing runs or changes until you choose what to verify.</p>
+          <button class="button button-primary button-full" id="propose-button" type="button" disabled>
+            <span class="button-symbol" aria-hidden="true">✳</span><span class="button-label">Ask for repair options</span><span class="button-arrow" aria-hidden="true">↗</span>
+          </button>
+          <div id="proposal-area" class="proposal-area" aria-live="polite" aria-busy="false">
+            <div class="proposal-empty"><span class="empty-orbit" aria-hidden="true"><span>✳</span></span><strong>Waiting for your direction</strong><p>Request options to see the model’s explanation, bounded edits, and stated uncertainty.</p></div>
+          </div>
+          <div id="selection-controls" class="selection-controls" hidden>
+            <div class="selection-header"><span class="mini-label">YOUR PATCH SELECTION</span><span id="selection-count" class="selection-count">0 selected</span></div>
+            <div id="repair-options" class="repair-options"></div>
+            <div class="selection-actions">
+              <button type="button" class="text-button" id="select-all-button">Select all</button>
+              <span class="action-separator" aria-hidden="true">·</span>
+              <button type="button" class="text-button" id="clear-selection-button">Clear</button>
+            </div>
+            <button class="button button-dark button-full" id="verify-button" type="button" disabled><span class="verify-icon" aria-hidden="true">✓</span><span class="button-label">Verify selected patch</span><span class="button-arrow" aria-hidden="true">→</span></button>
+            <p class="button-caption">Verification tests this exact selection in the controlled fixture.</p>
+          </div>
+          <div class="planner-footnote"><span class="lock-mark" aria-hidden="true">◈</span><span>Fixture mode uses pre-authored edits selected by the model. Local-file repair has a separate review and execution flow below.</span></div>
+        </section>
+
+        <section class="panel model-output-panel" id="model-output-panel" aria-labelledby="model-output-heading" hidden>
+          <div class="panel-heading compact-heading"><div><p class="section-kicker">MODEL OUTPUT</p><h2 id="model-output-heading">Reasoning &amp; uncertainty</h2></div><span id="model-label" class="model-name"></span></div>
+          <p id="proposal-summary" class="proposal-summary"></p>
+          <div class="uncertainty-heading"><span class="uncertainty-glyph" aria-hidden="true">?</span><h3>What remains uncertain</h3></div>
+          <ul id="uncertainty-list" class="uncertainty-list"></ul>
+          <details class="raw-output-details"><summary>View structured model response</summary><pre id="raw-proposal" class="code-block raw-code"></pre></details>
+        </section>
+      </aside>
+    </div>
+
+    <section class="verification-section" id="verification-section" aria-labelledby="verification-heading">
+      <div class="verification-heading-row">
+        <div><p class="section-kicker"><span class="kicker-index">C</span> BEFORE / AFTER</p><h2 id="verification-heading">Verification record</h2></div>
+        <span id="verification-state" class="verification-state">Not run</span>
+      </div>
+      <div id="verification-placeholder" class="verification-placeholder"><span class="placeholder-icon" aria-hidden="true">⌁</span><div><strong>Your comparison will appear here</strong><p>Choose one or more proposed repairs, then run verification to capture the before and after evidence.</p></div></div>
+      <div id="verification-stale" class="verification-stale" hidden role="status">Selection changed. Run verification again to refresh the evidence for this exact patch.</div>
+      <div id="verification-results" hidden>
+        <div class="method-banner"><span class="method-dot" aria-hidden="true"></span><span>Chromium keyboard run · JavaScript disabled · HTTP/WebSocket requests intercepted · not a network sandbox</span><span class="method-badge">OBSERVED</span></div>
+        <div class="comparison-grid">
+          <article class="comparison-card before-card" aria-labelledby="before-title">
+            <div class="comparison-title"><div><span class="comparison-index">01</span><h3 id="before-title">Before</h3></div><span class="comparison-tag tag-before">BASELINE</span></div>
+            <p id="before-summary" class="comparison-summary"></p>
+            <h4 class="evidence-subtitle">Checks</h4><div id="before-checks" class="result-check-list"></div>
+            <h4 class="evidence-subtitle">Keyboard focus trace</h4><div id="before-trace" class="result-trace"></div>
+          </article>
+          <article class="comparison-card after-card" aria-labelledby="after-title">
+            <div class="comparison-title"><div><span class="comparison-index">02</span><h3 id="after-title">After</h3></div><span class="comparison-tag tag-after">CANDIDATE</span></div>
+            <p id="after-summary" class="comparison-summary"></p>
+            <h4 class="evidence-subtitle">Checks</h4><div id="after-checks" class="result-check-list"></div>
+            <h4 class="evidence-subtitle">Keyboard focus trace</h4><div id="after-trace" class="result-trace"></div>
+          </article>
+        </div>
+        <div class="diff-panel">
+          <div class="diff-heading"><div><span class="diff-icon" aria-hidden="true">±</span><div><h3>Proposed source diff</h3><p>Candidate only · the fixture source remains unchanged</p></div></div><button id="copy-diff-button" type="button" class="copy-button" disabled><span aria-hidden="true">▢</span> Copy diff</button></div>
+          <pre class="diff-block" tabindex="0" aria-label="Proposed source diff"><code id="diff-output">The verified candidate diff will appear here.</code></pre>
+        </div>
+        <div class="limitations-panel" id="limitations-panel" hidden><div class="limitations-mark" aria-hidden="true">i</div><div><h3>Limitations returned with this verification</h3><ul id="limitations-list"></ul></div></div>
+      </div>
+      <div id="verification-error" class="verification-error" hidden role="alert"></div>
+    </section>
+
+    <section class="local-workspace" aria-labelledby="local-heading" id="local-workspace">
+      <div class="local-heading-row">
+        <div><p class="section-kicker"><span class="kicker-index">D</span> OPTIONAL · YOUR HTML</p><h2 id="local-heading">Inspect a trusted local file</h2><p class="local-lede">Choose a single HTML file and define the exact keyboard sequence to try. AccessPatch does not open a hosted page or scan your repository.</p></div>
+        <span class="local-only-badge"><span aria-hidden="true">⌂</span> LOCAL WORKFLOW</span>
+      </div>
+      <div class="local-disclosure" role="note">
+        <span class="disclosure-icon" aria-hidden="true">!</span>
+        <p><strong>Only use HTML you trust.</strong> A fresh local Chromium context runs the original file and, when you verify, the proposed candidate. JavaScript can execute. HTTP and WebSocket requests are intercepted; downloads and service workers are blocked. This is not OS-level isolation or a network sandbox, and other browser network paths may remain. External assets and network-dependent behavior may not work.</p>
+      </div>
+      <div class="local-grid">
+        <div class="local-input-panel">
+          <div class="local-panel-title"><span class="local-step">01</span><div><h3>Choose file &amp; journey</h3><p>Single <code>.html</code> file · up to 500 KB</p></div></div>
+          <label class="file-picker" for="html-file">
+            <span class="file-picker-icon" aria-hidden="true">↑</span>
+            <span><strong>Choose an HTML file</strong><small id="file-selection-status">File stays in this tab until you choose an action.</small></span>
+            <input id="html-file" type="file" accept=".html,.htm,text/html" aria-describedby="file-help file-error">
+          </label>
+          <p id="file-help" class="field-help">The source is sent only to this local AccessPatch server when you request an action. It is never saved by this page.</p>
+          <p id="file-error" class="field-error" role="status" hidden></p>
+
+          <div class="journey-editor">
+            <div class="journey-title-row"><div><h4>Keyboard journey</h4><p>Choose 1–20 keys in the order to send.</p></div><span id="journey-count" class="journey-count">0 / 20</span></div>
+            <ol id="journey-steps" class="journey-steps" aria-label="Keyboard journey sequence"></ol>
+            <div class="journey-empty" id="journey-empty">No keys added yet. Start with the key you want to test.</div>
+            <button type="button" class="add-key-button" id="add-key-button"><span aria-hidden="true">＋</span> Add key step</button>
+            <p class="journey-allowed">Allowed keys: Tab, Shift+Tab, arrow keys, Enter, Escape, Space.</p>
+          </div>
+
+          <div class="consent-block">
+            <label class="consent-label"><input id="run-consent" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span><strong>Allow one local browser run</strong><small>I trust this HTML and consent to the next local action only. JavaScript can execute. I will confirm again before running a candidate. This is not OS-level isolation.</small></span></label>
+            <label class="consent-label model-consent-label"><input id="model-consent" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span><strong>Allow one model request to send source</strong><small>For a repair request, send up to 12,000 characters of this HTML to the configured NVIDIA Nemotron model via Nebius Token Factory. I have checked it for secrets or sensitive content. This is separate from local execution.</small></span></label>
+          </div>
+
+          <div class="local-actions">
+            <button type="button" class="button button-outline" id="inspect-local-button" disabled><span aria-hidden="true">⌖</span><span class="button-label">Capture baseline</span></button>
+            <button type="button" class="button button-primary" id="propose-local-button" disabled><span aria-hidden="true">✳</span><span class="button-label">Request repair</span></button>
+          </div>
+          <div class="local-action-status" id="local-action-status" role="status" aria-live="polite">Choose a file and add at least one key to begin.</div>
+        </div>
+
+        <div class="local-output-panel">
+          <div class="local-panel-title"><span class="local-step local-step-muted">02</span><div><h3>Evidence &amp; candidate</h3><p>Nothing is applied automatically.</p></div></div>
+          <div id="local-baseline-output" class="local-output-block">
+            <div class="local-output-empty"><span aria-hidden="true">⌁</span><strong>Baseline not captured</strong><p>Choose a trusted file, add a keyboard journey, opt in to local execution, then capture its focus path.</p></div>
+          </div>
+          <div id="local-proposal-output" class="local-output-block proposal-output-block">
+            <div class="local-output-empty subdued-empty"><span aria-hidden="true">✳</span><strong>No model proposal</strong><p>The model only sees this file after you opt in and request a repair.</p></div>
+          </div>
+          <div id="local-verify-controls" class="local-verify-controls" hidden>
+            <div class="candidate-ready"><span class="candidate-check" aria-hidden="true">✓</span><div><strong>Candidate ready for review</strong><small>Review the full diff above. Verify runs both source versions with your keyboard journey.</small></div></div>
+            <button type="button" class="button button-dark button-full" id="verify-local-button" disabled><span aria-hidden="true">↹</span><span class="button-label">Verify candidate locally</span><span class="button-arrow" aria-hidden="true">→</span></button>
+            <div class="local-download-actions"><button type="button" class="download-button" id="download-candidate-button" hidden>Download verified candidate HTML</button><button type="button" class="download-button" id="download-report-button" hidden>Download evidence report (JSON)</button></div>
+          </div>
+          <div id="local-verify-output" class="local-output-block local-verify-output" hidden></div>
+        </div>
+      </div>
+      <div class="local-limitations"><span class="limits-icon" aria-hidden="true">i</span><div><strong>Scope limits</strong><p>One HTML file only. Model proposals can add limited attributes or replace a simple text-only div with a button; they cannot repair a whole site. Dynamic pages, iframes, external assets, network-dependent behavior, and full site accessibility are outside this run. Browser observations are evidence for your selected journey, not a compliance claim.</p></div></div>
+    </section>
+
+    <footer class="page-footer"><span class="footer-brand">ACCESS<span>PATCH</span></span><span>Human-reviewed repairs · observed keyboard journeys</span><a href="#main">Back to top ↑</a></footer>
+  </main>
+</body>
+</html>
