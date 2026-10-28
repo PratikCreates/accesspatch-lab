@@ -1,4 +1,4 @@
-import io, json, os, socket, sys, threading, unittest
+import io, json, os, socket, sys, threading, time, unittest, urllib.request
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -104,6 +104,25 @@ class RepairTests(unittest.TestCase):
             self.assertFalse(thread.is_alive())
             self.assertEqual(received,[],'WebRTC reached the TURN listener')
         finally:listener.close()
+    def test_slow_request_body_releases_work_slots(self):
+        class FastTimeoutHandler(server.Handler): body_read_timeout=0.25
+        http=server.ThreadingHTTPServer(('127.0.0.1',0),FastTimeoutHandler)
+        thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start()
+        port=http.server_port; clients=[]
+        try:
+            for _ in range(2):
+                client=socket.create_connection(('127.0.0.1',port),timeout=2);clients.append(client)
+                client.sendall(f'POST /api/verify HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n'.encode())
+            for client in clients:
+                client.settimeout(3)
+                self.assertIn(b'408',client.recv(1024))
+            # Both semaphore slots must be available after the incomplete reads expire.
+            with patch.object(server,'verify',return_value={'ok':True}):
+                req=urllib.request.Request(f'http://127.0.0.1:{port}/api/verify',data=b'{"repair_ids":[]}',headers={'Content-Type':'application/json'})
+                with urllib.request.urlopen(req,timeout=3) as response:self.assertEqual(response.status,200)
+        finally:
+            for client in clients:client.close()
+            http.shutdown();http.server_close();thread.join(3)
     def test_browser_dynamic_focus_and_fixture_partial_repair(self):
         source="<button id='a'>Open</button><button id='b'>Next</button><script>document.querySelector('#a').addEventListener('keydown',e=>{if(e.key==='ArrowDown')document.querySelector('#b').focus()})</script>"
         report=server.audit(source,'local',['Tab','ArrowDown'])

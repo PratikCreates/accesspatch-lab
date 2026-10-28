@@ -1,5 +1,5 @@
 """AccessPatch: constrained accessibility repair demonstration for one controlled fixture."""
-import difflib, html, json, os, re, shutil, subprocess, threading, urllib.error, urllib.request
+import difflib, html, json, os, re, shutil, socket, subprocess, threading, time, urllib.error, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from html.parser import HTMLParser
 from pathlib import Path
@@ -181,8 +181,15 @@ def check_journey(journey):
     if not isinstance(journey,list) or not 1<=len(journey)<=20 or any(not isinstance(k,str) or k not in allowed for k in journey):raise ValueError('Journey must contain 1–20 supported keys.')
 
 class Handler(BaseHTTPRequestHandler):
+    body_read_timeout = 10
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(self.body_read_timeout)
     def json_response(self,status,payload):
-        body=json.dumps(payload,ensure_ascii=False).encode();self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+        body=json.dumps(payload,ensure_ascii=False).encode()
+        try:
+            self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, socket.timeout): pass
     def do_GET(self):
         if self.path == '/api/workspace':
             try:self.json_response(200,{'fixture':{'id':'signup','title':'Community garden signup','description':'A controlled synthetic form with three seeded accessibility defects. The green square is decorative.','source':FIXTURE},'audit':audit(FIXTURE),'model':MODEL})
@@ -205,7 +212,18 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length=int(self.headers.get('Content-Length','0'))
             if length < 1 or length > 750000:raise ValueError('Request size is invalid.')
-            payload=json.loads(self.rfile.read(length))
+            # Bound total elapsed read time, including a client that trickles bytes.
+            deadline=time.monotonic()+self.body_read_timeout
+            chunks=[]; remaining=length
+            while remaining:
+                timeout=deadline-time.monotonic()
+                if timeout<=0: raise socket.timeout()
+                self.connection.settimeout(timeout)
+                chunk=self.rfile.read1(min(remaining,65536))
+                if not chunk: raise ValueError('Request body was incomplete.')
+                chunks.append(chunk);remaining-=len(chunk)
+            self.connection.settimeout(self.body_read_timeout)
+            payload=json.loads(b''.join(chunks))
             if not isinstance(payload,dict):raise ValueError('Expected a JSON object.')
             if self.path == '/api/local-propose':
                 if payload.get('consent') is not True:raise ValueError('Explicit consent to send the source to Nebius is required.')
@@ -227,6 +245,7 @@ class Handler(BaseHTTPRequestHandler):
                 inspection=audit(source,mode='local',journey=journey)
                 self.json_response(200,{'audit':inspection,'limitations':['This local page ran with JavaScript enabled in a fresh Chromium context with HTTP and WebSocket requests intercepted and service workers blocked; other network paths are not guaranteed blocked. Browser isolation is not OS-level containment: use trusted pages only.', 'External HTTP assets and APIs were blocked during this run; other network paths are not guaranteed blocked. Results may differ from the deployed page.', 'Only two narrow checks are automated. Keyboard focus is observed, but role and name are DOM-based approximations, not platform accessibility tree values. Passing checks is not compliance.', 'Your page is not sent to the model and no repairs are generated for it.']})
             else:self.json_response(200,propose() if self.path=='/api/propose' else verify(payload.get('repair_ids')))
+        except socket.timeout:self.json_response(408,{'error':'Request body timed out.'})
         except (ValueError,json.JSONDecodeError) as e:self.json_response(400,{'error':str(e)})
         except Exception as e:self.json_response(502,{'error':str(e) if isinstance(e,RuntimeError) else 'Unable to complete this request.'})
         finally:LOCK.release()
