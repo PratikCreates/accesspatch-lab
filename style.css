@@ -435,6 +435,41 @@ h1 { margin: 11px 0 9px; color: var(--ink); font-family: var(--display); font-si
 .field-help, .local-output-empty p, .local-report-heading small, .local-result-heading, .local-compare-summary, .local-limit-list, .local-limitations p { font-size: 8px; }
 .consent-label strong, .local-output-empty strong, .local-report-heading strong, .local-proposal-summary, .local-repair-reason, .local-uncertainty ul, .local-run-banner, .local-compare-heading h4, .local-compare-card .local-checks .result-check-copy strong { font-size: 9px; }
 .consent-label small, .local-checks .result-check-copy strong, .local-checks .result-check-copy p, .local-trace .result-trace-step strong, .attribute-edit code, .local-uncertainty > strong { font-size: 8px; }
+.asset-picker-group { margin-top: 12px; padding-top: 13px; border-top: 1px solid #e8eded; }
+.asset-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.asset-heading-row h4 { margin: 0; color: #3f5964; font-size: 9px; font-weight: 700; }
+.asset-heading-row p { margin: 3px 0 0; color: var(--muted); font-size: 8px; }
+.asset-folder-picker { min-height: 50px; }
+.asset-picker-icon { color: #567d87; }
+.asset-list { display: grid; gap: 4px; margin: 7px 0 0; padding: 0; list-style: none; }
+.asset-file-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 7px; border: 1px solid #e5ebeb; border-radius: 5px; background: #fff; }
+.asset-file-copy { display: grid; min-width: 0; gap: 2px; }
+.asset-file-path { overflow-wrap: anywhere; color: #49606d; font-family: var(--mono); font-size: 8px; }
+.asset-file-size { color: #86949a; font-size: 7px; }
+.asset-remove-button { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; border: 1px solid #e7ebeb; border-radius: 4px; color: #946d68; background: #fff; font-size: 14px; cursor: pointer; }
+.asset-remove-button:hover { border-color: #e1bcb6; background: #fff7f5; }
+.clear-assets-button { margin-top: 6px; padding: 3px 0; border: 0; color: #8a605c; background: none; font-size: 8px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.field-info { margin: 6px 1px 0; color: #886b38; font-size: 8px; line-height: 1.45; }
+.resource-counts { display: block; margin-top: 3px; color: #6f6040; font-family: var(--mono); font-size: 8px; font-weight: 500; }
+.resource-details { margin: 9px 0; border: 1px solid #e0e8e8; border-radius: 6px; background: #fcfdfd; }
+.resource-summary { display: flex; align-items: center; gap: 7px; padding: 8px 9px; color: #596f79; font-size: 8px; font-weight: 600; cursor: pointer; list-style: none; }
+.resource-summary::-webkit-details-marker { display: none; }
+.resource-summary::after { content: '＋'; margin-left: auto; color: #78918d; font-size: 11px; }
+.resource-details[open] .resource-summary::after { content: '−'; }
+.resource-summary-icon { width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; color: #66847d; background: #edf5f2; font-size: 9px; }
+.resource-report-body { display: grid; gap: 6px; padding: 0 8px 8px; }
+.resource-group { padding: 7px 8px; border: 1px solid #e9eeee; border-radius: 5px; background: #fff; }
+.resource-group h5 { margin: 0 0 4px; color: #627780; font-size: 8px; font-weight: 700; }
+.resource-group.is-loaded h5 { color: #357865; }
+.resource-group.is-missing h5 { color: #916d35; }
+.resource-group.is-blocked h5 { color: #865f5a; }
+.resource-list { display: grid; gap: 3px; max-height: 115px; margin: 0; padding-left: 14px; overflow: auto; color: #71838c; font-family: var(--mono); font-size: 7px; line-height: 1.45; }
+.resource-list li { overflow-wrap: anywhere; }
+.resource-empty, .resource-truncated { margin: 0; color: #87969b; font-size: 7px; line-height: 1.4; }
+.resource-more, .resource-truncated { color: #8a7044; }
+.local-compare-card .resource-details { margin: 6px 0; }
+.local-compare-card .resource-summary { padding: 6px; font-size: 7px; }
+.local-compare-card .resource-report-body { padding: 0 6px 6px; }
 
 @media (max-width: 980px) {
   .page-shell { width: min(100% - 40px, 800px); }

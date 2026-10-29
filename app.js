@@ -2,8 +2,12 @@
   'use strict';
 
   const MAX_FILE_BYTES = 500000;
-  const MAX_MODEL_CHARACTERS = 12000;
+  const MAX_MODEL_CHARACTERS = 24000;
+  const MAX_MODEL_BYTES = 96000;
   const MAX_KEYS = 20;
+  const MAX_ASSET_FILES = 25;
+  const MAX_ASSET_BYTES = 1000000;
+  const MAX_ASSET_FILE_BYTES = 500000;
   const ALLOWED_KEYS = [
     ['Tab', 'Tab'],
     ['Shift+Tab', 'Shift + Tab'],
@@ -26,6 +30,11 @@
       file: null,
       validFile: false,
       source: null,
+      assets: [],
+      assetsValid: true,
+      assetsError: '',
+      ignoredAssetCount: 0,
+      assetRootName: '',
       journey: [],
       baseline: null,
       proposal: null,
@@ -315,15 +324,18 @@
 
     const fileReady = state.local.validFile && state.local.file;
     const journeyReady = state.local.journey.length >= 1 && state.local.journey.length <= MAX_KEYS;
+    const bundleReady = state.local.assetsValid;
     const sourceReady = typeof state.local.source === 'string';
-    const canRun = fileReady && journeyReady && $('run-consent').checked;
+    const canRun = fileReady && bundleReady && journeyReady && $('run-consent').checked;
     $('inspect-local-button').disabled = !canRun || state.busy.has('inspect-local-button');
     const modelChars = sourceReady ? Array.from(state.local.source).length : 0;
-    $('propose-local-button').disabled = !fileReady || (sourceReady && (modelChars === 0 || modelChars > MAX_MODEL_CHARACTERS)) || !$('model-consent').checked || state.busy.has('propose-local-button');
+    const modelBytes = sourceReady ? new TextEncoder().encode(state.local.source).byteLength : 0;
+    const modelOverLimit = sourceReady && (modelChars > MAX_MODEL_CHARACTERS || modelBytes > MAX_MODEL_BYTES);
+    $('propose-local-button').disabled = !fileReady || (sourceReady && (modelChars === 0 || modelOverLimit)) || !$('model-consent').checked || state.busy.has('propose-local-button');
     $('verify-local-button').disabled = !state.local.proposal?.candidate_source || !canRun || state.busy.has('verify-local-button');
     $('add-key-button').disabled = state.local.journey.length >= MAX_KEYS;
-    if (sourceReady && modelChars > MAX_MODEL_CHARACTERS) {
-      $('file-error').textContent = `This file has ${modelChars.toLocaleString()} characters. Local model proposals are limited to ${MAX_MODEL_CHARACTERS.toLocaleString()} characters; local inspection can still run.`;
+    if (sourceReady && modelOverLimit) {
+      $('file-error').textContent = `This source is ${modelChars.toLocaleString()} characters / ${modelBytes.toLocaleString()} UTF-8 bytes. Model proposals are limited to ${MAX_MODEL_CHARACTERS.toLocaleString()} characters and ${MAX_MODEL_BYTES.toLocaleString()} bytes; local inspection can still run.`;
       $('file-error').hidden = false;
     }
   }
@@ -511,20 +523,85 @@
     warning.append(create('span', 'evidence-warning-icon', '!'));
     const copy = create('p', '');
     copy.append(create('strong', '', 'This browser run can differ from the deployed page.'));
-    copy.append(document.createTextNode(' External CSS and JavaScript may be blocked. Visually hidden controls can appear in a keyboard trace; treat it as evidence for this isolated run, not proof of accessibility.'));
+    copy.append(document.createTextNode(' The HTTP resource log covers intercepted HTTP requests only; other browser resource mechanisms may not appear. Visually hidden controls can appear in the keyboard trace. This is evidence for this run, not proof of accessibility.'));
     warning.append(copy);
     return warning;
   }
 
+  function resourceCounts(resources) {
+    if (!resources || typeof resources !== 'object') return null;
+    return {
+      loaded: Array.isArray(resources.loaded) ? resources.loaded : [],
+      missing: Array.isArray(resources.missing) ? resources.missing : [],
+      blocked: Array.isArray(resources.blocked) ? resources.blocked : [],
+      truncated: resources.truncated === true
+    };
+  }
+
+  function renderResourceWarning(runs) {
+    const warning = localEvidenceWarning();
+    const copy = warning.querySelector('p');
+    const reports = (Array.isArray(runs) ? runs : [{ label: 'This run', resources: runs }])
+      .map((run) => ({ label: run.label || 'This run', counts: resourceCounts(run.resources) }));
+    const available = reports.filter((report) => report.counts);
+    if (!available.length) {
+      copy.append(document.createTextNode(' Intercepted HTTP resource details were not returned, so selected asset loading cannot be confirmed from this report.'));
+      return warning;
+    }
+    const countsLine = create('span', 'resource-counts', `Intercepted HTTP request records: ${available.map(({ label, counts }) => `${label}: ${counts.loaded.length} selected CSS/JS responses · ${counts.missing.length} missing local resources · ${counts.blocked.length} blocked`).join(' | ')}`);
+    copy.append(document.createElement('br'), countsLine);
+    if (reports.some(({ counts }) => counts?.truncated)) copy.append(document.createTextNode(' At least one run reached the 200-record cap; the displayed resource lists and counts are partial.'));
+    else if (available.some(({ counts }) => counts.missing.length || counts.blocked.length)) copy.append(document.createTextNode(' Missing or blocked HTTP resources can change layout and keyboard behavior.'));
+    if (available.length < reports.length) copy.append(document.createTextNode(' HTTP resource details were missing for at least one run.'));
+    return warning;
+  }
+
+  function renderResourceReport(container, resources) {
+    const counts = resourceCounts(resources);
+    const details = create('details', 'resource-details');
+    const summary = create('summary', 'resource-summary');
+    const label = counts
+      ? `Intercepted HTTP log · ${counts.loaded.length} selected CSS/JS served · ${counts.missing.length} missing local · ${counts.blocked.length} blocked${counts.truncated ? ' · partial list' : ''}`
+      : 'Intercepted HTTP log · unavailable';
+    summary.append(create('span', 'resource-summary-icon', '↗'), create('span', '', label));
+    details.append(summary);
+    const body = create('div', 'resource-report-body');
+    if (!counts) {
+      body.append(create('p', 'resource-empty', 'The server did not return HTTP resource details for this run.'));
+    } else {
+      const groups = [
+        ['Served from selected CSS/JS', counts.loaded, (item) => `${textOf(item.path, 'path not returned')} ← ${textOf(item.url, 'URL not returned')}`, 'is-loaded'],
+        ['Missing local HTTP resources', counts.missing, (item) => textOf(item.url, 'URL not returned'), 'is-missing'],
+        ['Blocked HTTP requests', counts.blocked, (item) => textOf(item.url, 'URL not returned'), 'is-blocked']
+      ];
+      groups.forEach(([title, entries, format, tone]) => {
+        const group = create('section', `resource-group ${tone}`);
+        group.append(create('h5', '', `${title} (${entries.length})`));
+        if (!entries.length) group.append(create('p', 'resource-empty', 'No records returned.'));
+        else {
+          const list = create('ul', 'resource-list');
+          entries.slice(0, 30).forEach((entry) => list.append(create('li', '', format(entry))));
+          if (entries.length > 30) list.append(create('li', 'resource-more', `${entries.length - 30} more returned records not shown.`));
+          group.append(list);
+        }
+        body.append(group);
+      });
+      if (counts.truncated) body.append(create('p', 'resource-truncated', 'The audit stopped recording HTTP resource details after 200 requests; counts and lists are partial.'));
+    }
+    details.append(body);
+    container.append(details);
+  }
+
   function renderLocalAudit(container, audit, limitations, title = 'Baseline captured') {
     container.replaceChildren();
-    container.append(localEvidenceWarning());
+    container.append(renderResourceWarning([{ label: 'Baseline', resources: audit?.resources }]));
     const heading = create('div', 'local-report-heading');
     heading.append(create('span', 'local-report-dot', '✓'));
     const copy = create('div');
     copy.append(create('strong', '', title), create('small', '', renderSummary(audit?.summary)));
     heading.append(copy);
     container.append(heading);
+    renderResourceReport(container, audit?.resources);
     const checksTitle = create('h4', 'local-result-heading', 'Observed checks');
     container.append(checksTitle);
     const checks = create('div', 'local-checks');
@@ -551,7 +628,6 @@
     $('local-verify-output').replaceChildren();
     $('download-candidate-button').hidden = true;
     $('download-report-button').hidden = true;
-    $('download-report-button').hidden = true;
   }
 
   function journeyChanged() {
@@ -577,6 +653,7 @@
     $('local-verify-output').hidden = true;
     $('local-verify-output').replaceChildren();
     $('download-candidate-button').hidden = true;
+    $('download-report-button').hidden = true;
     $('run-consent').checked = false;
     $('model-consent').checked = false;
     $('file-error').hidden = true;
@@ -618,6 +695,159 @@
     syncButtons();
   }
 
+  function normalizeAssetPath(file) {
+    const raw = file.webkitRelativePath || file.name;
+    const parts = raw.split('/');
+    if (file.webkitRelativePath && parts.length > 1) parts.shift();
+    return parts.join('/');
+  }
+
+  function validAssetPath(path) {
+    if (!path || path.length > 240 || path.startsWith('/')) return false;
+    const parts = path.split('/');
+    return parts.every((part) => part && part !== '.' && part !== '..' && /^[A-Za-z0-9_. -]+$/.test(part)) && /\.(?:css|js|mjs)$/i.test(path);
+  }
+
+  function refreshAssetSelection() {
+    const list = $('asset-list');
+    list.replaceChildren();
+    state.local.assets.forEach((asset, index) => {
+      const item = create('li', 'asset-file-row');
+      const name = create('code', 'asset-file-path', asset.path);
+      const metadata = create('span', 'asset-file-size', `${(asset.file.size / 1024).toFixed(1)} KB · ${asset.path.toLowerCase().endsWith('.css') ? 'CSS' : 'JavaScript'}`);
+      const copy = create('span', 'asset-file-copy');
+      copy.append(name, metadata);
+      const remove = create('button', 'asset-remove-button', '×');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove selected asset ${asset.path}`);
+      remove.addEventListener('click', () => {
+        state.local.assets.splice(index, 1);
+        state.local.assetsError = '';
+        state.local.assetsValid = true;
+        state.local.ignoredAssetCount = 0;
+        state.local.assetRootName = '';
+        invalidateAssetEvidence();
+        refreshAssetSelection();
+      });
+      item.append(copy, remove);
+      list.append(item);
+    });
+    const count = state.local.assets.length;
+    $('asset-count').textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
+    $('clear-assets-button').hidden = count === 0 && state.local.assetsValid;
+
+    if (state.local.assetsError) {
+      $('asset-error').textContent = state.local.assetsError;
+      $('asset-error').className = 'field-error';
+      $('asset-error').hidden = false;
+      $('asset-selection-status').textContent = 'Asset selection rejected; no assets will be sent.';
+    } else if (count) {
+      const root = state.local.assetRootName ? ` from “${state.local.assetRootName}”` : '';
+      $('asset-selection-status').textContent = `${count} CSS/JS file${count === 1 ? '' : 's'}${root}; only listed paths are sent to the local server.`;
+      if (state.local.ignoredAssetCount) {
+        $('asset-error').textContent = `${state.local.ignoredAssetCount} non-CSS/JS file${state.local.ignoredAssetCount === 1 ? '' : 's'} ignored. References to those files may be missing or blocked.`;
+        $('asset-error').className = 'field-info';
+        $('asset-error').hidden = false;
+      } else {
+        $('asset-error').hidden = true;
+      }
+    } else {
+      $('asset-selection-status').textContent = 'No CSS/JS folder selected. This step is optional.';
+      if (state.local.ignoredAssetCount) {
+        $('asset-error').textContent = `No CSS/JS files found. ${state.local.ignoredAssetCount} other file${state.local.ignoredAssetCount === 1 ? ' was' : 's were'} ignored.`;
+        $('asset-error').className = 'field-info';
+        $('asset-error').hidden = false;
+      } else {
+        $('asset-error').hidden = true;
+      }
+    }
+    syncButtons();
+  }
+
+  function invalidateAssetEvidence() {
+    state.local.baseline = null;
+    $('run-consent').checked = false;
+    renderLocalEmptyBaseline('The selected asset bundle changed. Capture a new baseline with this exact HTML and bundle.');
+    clearLocalVerification();
+    if (state.local.file) setLocalStatus('Asset selection changed. Review the file list and confirm local execution again.');
+  }
+
+  function handleAssetFolderChange() {
+    const selected = Array.from($('asset-folder').files || []);
+    $('asset-folder').value = '';
+    const supported = selected.filter((file) => /\.(?:css|js|mjs)$/i.test(file.name));
+    state.local.ignoredAssetCount = selected.length - supported.length;
+    state.local.assetRootName = selected[0]?.webkitRelativePath?.split('/')[0] || '';
+    state.local.assetsError = '';
+    state.local.assetsValid = true;
+    const normalized = supported.map((file) => ({ file, path: normalizeAssetPath(file) }));
+    const seen = new Set();
+    let totalBytes = 0;
+    for (const asset of normalized) {
+      if (!validAssetPath(asset.path)) {
+        state.local.assetsError = `Invalid relative path “${asset.path}”. Use CSS/JS files with a relative path containing letters, numbers, spaces, dots, underscores or hyphens only.`;
+        break;
+      }
+      if (seen.has(asset.path)) {
+        state.local.assetsError = `Duplicate relative path “${asset.path}”. Select one copy of each CSS/JS path.`;
+        break;
+      }
+      seen.add(asset.path);
+      if (asset.file.size > MAX_ASSET_FILE_BYTES) {
+        state.local.assetsError = `${asset.path} exceeds the 500,000-byte per-file limit.`;
+        break;
+      }
+      totalBytes += asset.file.size;
+    }
+    if (!state.local.assetsError && normalized.length > MAX_ASSET_FILES) {
+      state.local.assetsError = `The selected folder contains ${normalized.length} CSS/JS files. Select at most ${MAX_ASSET_FILES} files.`;
+    }
+    if (!state.local.assetsError && totalBytes > MAX_ASSET_BYTES) {
+      state.local.assetsError = 'The selected CSS/JS files exceed the 1,000,000-byte total limit.';
+    }
+    if (state.local.assetsError) {
+      state.local.assets = [];
+      state.local.assetsValid = false;
+    } else {
+      state.local.assets = normalized;
+    }
+    invalidateAssetEvidence();
+    refreshAssetSelection();
+  }
+
+  function clearSelectedAssets() {
+    state.local.assets = [];
+    state.local.assetsValid = true;
+    state.local.assetsError = '';
+    state.local.ignoredAssetCount = 0;
+    state.local.assetRootName = '';
+    $('asset-folder').value = '';
+    invalidateAssetEvidence();
+    refreshAssetSelection();
+  }
+
+  async function readSelectedAssets() {
+    if (!state.local.assetsValid) throw new Error(state.local.assetsError || 'Choose a valid relative CSS/JS bundle or clear the selected assets.');
+    const assets = [];
+    let totalBytes = 0;
+    for (const asset of state.local.assets) {
+      let content;
+      let bytes;
+      try {
+        const buffer = await asset.file.arrayBuffer();
+        bytes = buffer.byteLength;
+        content = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      } catch (error) {
+        throw new Error(`${asset.path} could not be decoded as UTF-8 CSS/JS text. ${error.message || ''}`.trim());
+      }
+      if (bytes > MAX_ASSET_FILE_BYTES) throw new Error(`${asset.path} exceeds the 500,000-byte per-file limit after UTF-8 decoding.`);
+      totalBytes += bytes;
+      if (totalBytes > MAX_ASSET_BYTES) throw new Error('The selected CSS/JS files exceed the 1,000,000-byte total limit after UTF-8 decoding.');
+      assets.push({ path: asset.path, content });
+    }
+    return assets;
+  }
+
   async function readSelectedSource() {
     if (!state.local.validFile || !state.local.file) throw new Error('Choose one .html or .htm file of 500 KB or less.');
     if (state.local.source !== null) return state.local.source;
@@ -638,14 +868,15 @@
   }
 
   async function captureLocalBaseline() {
-    if (!state.local.validFile || !state.local.journey.length || !$('run-consent').checked) return;
+    if (!state.local.validFile || !state.local.assetsValid || !state.local.journey.length || !$('run-consent').checked) return;
     setBusy('inspect-local-button', true, 'Capturing…');
     setLocalStatus('Starting a fresh local browser run…');
     try {
       const source = await readSelectedSource();
+      const assets = await readSelectedAssets();
       const data = await requestJson('/api/inspect', {
         method: 'POST',
-        body: JSON.stringify({ source, journey: currentJourney(), consent: true })
+        body: JSON.stringify({ source, journey: currentJourney(), assets, consent: true })
       });
       state.local.baseline = data;
       renderLocalAudit($('local-baseline-output'), data.audit || {}, data.limitations, 'Baseline captured');
@@ -673,13 +904,15 @@
     const model = modelName(data.model);
     if (model) metadata.append(create('small', '', model));
     head.append(badge, metadata);
-    top.append(head, create('p', 'local-proposal-summary', textOf(proposal.summary, 'No proposal summary was returned.')));
+    top.append(head);
+    top.append(create('h4', 'local-result-heading', 'Model-stated summary · unverified'));
+    top.append(create('p', 'local-proposal-summary', textOf(proposal.summary, 'No proposal summary was returned.')));
 
     const repairs = Array.isArray(proposal.repairs) ? proposal.repairs : [];
-    const repairTitle = create('h4', 'local-result-heading', `Proposed attribute edits (${repairs.length})`);
+    const repairTitle = create('h4', 'local-result-heading', `Accepted edits included in candidate (${repairs.length})`);
     top.append(repairTitle);
     const repairList = create('div', 'local-repair-list');
-    if (repairs.length === 0) repairList.append(create('div', 'empty-evidence', 'No proposed edits were returned.'));
+    if (repairs.length === 0) repairList.append(create('div', 'empty-evidence', 'No edits passed AccessPatch’s bounded checks. The model summary may describe suggestions that were not accepted; it is not a verified finding.'));
     repairs.forEach((repair, index) => {
       const item = create('article', 'local-repair-item');
       const headRow = create('div', 'local-repair-item-heading');
@@ -704,7 +937,7 @@
     renderUncertainty(uncertaintyList, proposal.uncertainties);
     uncertainties.append(uncertaintyList);
     top.append(uncertainties);
-    top.append(create('p', 'model-review-note', 'Review every proposed value against the page content. Model output can be inaccurate; the candidate is not applied automatically.'));
+    top.append(create('p', 'model-review-note', 'The model-stated summary is unverified. Only the accepted edits above are included in this candidate diff. Review each edit against the source before verification; nothing is applied automatically.'));
     if (Array.isArray(data.limitations) && data.limitations.length) {
       const limit = create('div', 'local-result-limitations');
       limit.append(create('strong', '', 'Returned limitations'));
@@ -741,7 +974,8 @@
     try {
       const source = await readSelectedSource();
       const characterCount = Array.from(source).length;
-      if (characterCount > MAX_MODEL_CHARACTERS) throw new Error(`This file is ${characterCount.toLocaleString()} characters. The model request limit is ${MAX_MODEL_CHARACTERS.toLocaleString()}; use local inspection without a model proposal.`);
+      const byteCount = new TextEncoder().encode(source).byteLength;
+      if (characterCount > MAX_MODEL_CHARACTERS || byteCount > MAX_MODEL_BYTES) throw new Error(`This file is ${characterCount.toLocaleString()} characters / ${byteCount.toLocaleString()} UTF-8 bytes. The model request limit is ${MAX_MODEL_CHARACTERS.toLocaleString()} characters and ${MAX_MODEL_BYTES.toLocaleString()} bytes; local inspection can still run.`);
       const data = await requestJson('/api/local-propose', {
         method: 'POST',
         body: JSON.stringify({ source, consent: true })
@@ -764,7 +998,10 @@
   function renderLocalComparison(data) {
     const output = $('local-verify-output');
     output.replaceChildren();
-    output.append(localEvidenceWarning());
+    output.append(renderResourceWarning([
+      { label: 'Before', resources: data.before?.resources },
+      { label: 'After', resources: data.after?.resources }
+    ]));
     const banner = create('div', 'local-run-banner');
     banner.append(create('span', 'method-dot'), create('span', '', 'Fresh Chromium · keyboard-only · HTTP/WebSocket intercepted · other paths may remain'), create('strong', '', 'OBSERVED'));
     output.append(banner);
@@ -777,6 +1014,7 @@
       const heading = create('div', 'local-compare-heading');
       heading.append(create('h4', '', title), create('span', '', tag));
       card.append(heading, create('p', 'local-compare-summary', renderSummary(result?.summary)));
+      renderResourceReport(card, result?.resources);
       card.append(create('h5', 'local-result-heading', 'Checks'));
       const checks = create('div', 'local-checks');
       renderCheckList(checks, result?.checks, true);
@@ -814,23 +1052,25 @@
     const passed = Number(data.after?.summary?.passed);
     const total = Number(data.after?.summary?.total);
     setLocalStatus(Number.isFinite(passed) && Number.isFinite(total) && total > 0 && passed === total
-      ? 'All returned checks passed for this candidate in this one browser journey. Review the limitations above.'
-      : `${renderSummary(data.after?.summary)} for the candidate. Review the before/after traces and limitations above.`, false);
+      ? 'All returned checks passed for this candidate in this one browser journey. Review the limitations above. No model request was made during verification.'
+      : `${renderSummary(data.after?.summary)} for the candidate. Review the before/after traces and limitations above. No model request was made during verification.`, false);
   }
 
   async function verifyLocalCandidate() {
-    if (!state.local.proposal?.candidate_source || !$('run-consent').checked || !state.local.journey.length) return;
+    if (!state.local.proposal?.candidate_source || !state.local.assetsValid || !$('run-consent').checked || !state.local.journey.length) return;
     setBusy('verify-local-button', true, 'Verifying…');
     clearLocalVerification();
-    setLocalStatus('Running the original and candidate HTML in fresh local browser contexts…');
+    setLocalStatus('Sending the original and candidate HTML plus selected assets to this local server for fresh Chromium runs. No model request is made.');
     try {
       const source = await readSelectedSource();
+      const assets = await readSelectedAssets();
       const data = await requestJson('/api/local-verify', {
         method: 'POST',
         body: JSON.stringify({
           source,
           candidate_source: state.local.proposal.candidate_source,
           journey: currentJourney(),
+          assets,
           consent: true
         })
       });
@@ -871,13 +1111,21 @@
     const report = {
       title: 'AccessPatch local keyboard verification',
       generated_at: new Date().toISOString(),
-      scope: 'One user-selected HTML file and one explicitly chosen keyboard journey. This is not a site-wide accessibility audit or compliance claim.',
-      source_transmission: 'The selected HTML source was sent to the configured model only after explicit consent.',
+      scope: 'One user-selected HTML file, explicitly selected relative CSS/JS assets, and one keyboard journey. This is not a site-wide accessibility audit or compliance claim.',
+      source_transmission: {
+        model_proposal: state.local.proposal
+          ? 'A separate, explicitly consented local-propose request sent the HTML source to NVIDIA Nemotron via Nebius Token Factory. Selected CSS/JS asset contents were not sent.'
+          : 'No model proposal was made in this UI session.',
+        verification: 'This local-verify request sent the original HTML, candidate HTML, keyboard journey, and selected CSS/JS contents to the local AccessPatch server. Verification did not send source or assets to Nebius or another model.'
+      },
       keyboard_journey: currentJourney(),
+      selected_asset_paths: state.local.assets.map((asset) => asset.path),
+      asset_contents_included: false,
       browser_run: {
         engine: 'Fresh local Chromium context',
         javascript: 'Enabled for the trusted user-selected source and candidate',
         network: 'HTTP and WebSocket requests intercepted; other browser network paths are not guaranteed blocked',
+        resource_log: 'Before and after resource lists record intercepted HTTP requests only, with a cap of 200 records per run. They are not a complete network or asset fidelity report; other browser resource mechanisms may not appear.',
         service_workers_and_downloads: 'Blocked',
         isolation: 'Browser context only; not OS-level containment',
         focus_trace: 'Focused element is browser-observed. Displayed role and name are DOM-based approximations, not platform accessibility-tree values.'
@@ -889,7 +1137,8 @@
       proposed_diff: result.diff || '',
       limitations: [
         ...serverLimitations,
-        'External CSS and JavaScript may be blocked. Visually hidden controls may appear in focus traces; results can differ from the deployed page.',
+        'Only explicitly selected relative CSS/JS files are served from memory. Other HTTP resources are blocked; other browser network paths are not guaranteed blocked.',
+        'The resource log covers intercepted HTTP requests only. Other resource mechanisms may not appear in it; visually hidden controls may appear in focus traces and results can differ from the deployed page.',
         'This browser evidence covers only the selected keyboard journey and does not establish WCAG compliance or full accessibility.'
       ]
     };
@@ -934,6 +1183,8 @@
       }
     });
     $('html-file').addEventListener('change', handleFileChange);
+    $('asset-folder').addEventListener('change', handleAssetFolderChange);
+    $('clear-assets-button').addEventListener('click', clearSelectedAssets);
     $('add-key-button').addEventListener('click', () => {
       if (state.local.journey.length >= MAX_KEYS) return;
       state.local.journey.push('Tab');

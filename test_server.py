@@ -73,6 +73,35 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(len(result['proposal']['repairs']),1)
         self.assertIn('<button id="send" type="button">Send</button>',result['candidate_source'])
         self.assertIn('<div id="complex"><span>Bad</span></div>',result['candidate_source'])
+    @patch.dict(os.environ, {'NEBIUS_API_KEY':'test-key'})
+    def test_named_div_group_repair_requires_name_and_preserves_existing_role(self):
+        source='<div class="table-scroll" tabindex="0" aria-label="Compiler comparison table">table</div><div id="unnamed">x</div><div aria-label="Existing" role="region">x</div>'
+        repairs=[{'original_tag':'<div class="table-scroll" tabindex="0" aria-label="Compiler comparison table">','attribute':'role','value':'group','reason':'Named group'}, {'original_tag':'<div id="unnamed">','attribute':'role','value':'group','reason':'x'}, {'original_tag':'<div aria-label="Existing" role="region">','attribute':'role','value':'group','reason':'x'}]
+        with patch('urllib.request.urlopen',return_value=mock_model(repairs)):
+            result=server.local_propose(source)
+        self.assertEqual(len(result['proposal']['repairs']),1)
+        self.assertIn('aria-label="Compiler comparison table" role="group"',result['candidate_source'])
+        self.assertIn('<div id="unnamed">',result['candidate_source'])
+        self.assertIn('role="region"',result['candidate_source'])
+        self.assertIn('This proposal request sent',result['limitations'][0])
+    @patch.dict(os.environ, {'NEBIUS_API_KEY':'test-key'})
+    def test_model_source_cap_allows_real_size_and_rejects_over_limit(self):
+        source='<p>'+('x'*17556)+'</p>'
+        with patch('urllib.request.urlopen',return_value=mock_model([])):
+            self.assertEqual(server.local_propose(source)['candidate_source'],source)
+        with self.assertRaises(ValueError):server.local_propose('x'*24001)
+        with self.assertRaises(ValueError):server.local_propose('💡'*24001)
+    def test_verification_disclosure_is_request_specific(self):
+        http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler)
+        thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start()
+        payload={'source':'<button>One</button>','candidate_source':'<button>One</button>','journey':['Tab'],'consent':True}
+        try:
+            with patch.object(server,'audit',return_value={'checks':[],'keyboard':[],'summary':{'passed':0,'total':0}}):
+                req=urllib.request.Request(f'http://127.0.0.1:{http.server_port}/api/local-verify',data=json.dumps(payload).encode(),headers={'Content-Type':'application/json'})
+                with urllib.request.urlopen(req,timeout=3) as response:result=json.load(response)
+            self.assertIn('verification request does not send HTML to Nebius',result['limitations'][0])
+            self.assertFalse(any('source was sent' in item.lower() for item in result['limitations']))
+        finally:http.shutdown();http.server_close();thread.join(3)
     def test_browser_blocks_http_and_websocket_connections(self):
         listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen();listener.settimeout(3)
         port=listener.getsockname()[1]; received=[]
@@ -123,6 +152,20 @@ class RepairTests(unittest.TestCase):
         finally:
             for client in clients:client.close()
             http.shutdown();http.server_close();thread.join(3)
+    def test_bundle_validation_rejects_unsafe_paths_and_duplicates(self):
+        for path in ('../x.js','/x.js','a/../x.js','a\\x.js','C:/x.js','a/%2e%2e/x.js','a/x.js?query','a/x.html','a//x.js','a/./x.js'):
+            with self.subTest(path=path), self.assertRaises(ValueError):server.validate_assets([{'path':path,'content':''}])
+        with self.assertRaises(ValueError):server.validate_assets([{'path':'x.js','content':''},{'path':'x.js','content':''}])
+        with self.assertRaises(ValueError):server.validate_assets([{'path':'x.js','content':'x'*500001}])
+    def test_bundle_serves_selected_assets_and_reports_failures(self):
+        source="""<!doctype html><link rel='stylesheet' href='styles/main.css?v=1'><link rel='stylesheet' href='styles/missing.css'><script src='https://example.com/blocked.js'></script><button id='a'>Open</button><button id='b'>Next</button><script src='scripts/app.js'></script>"""
+        assets=server.validate_assets([{'path':'styles/main.css','content':'#a{color:rgb(1, 2, 3)}'}, {'path':'scripts/app.js','content':"const a=document.querySelector('#a');a.textContent=getComputedStyle(a).color;a.onkeydown=e=>{if(e.key==='ArrowDown')document.querySelector('#b').focus()}"}])
+        result=server.audit(source,'local',['Tab','ArrowDown'],assets)
+        self.assertEqual(result['keyboard'][0]['name'],'rgb(1, 2, 3)')
+        self.assertEqual(result['keyboard'][1]['target'],'b')
+        self.assertEqual({x['path'] for x in result['resources']['loaded']},{'styles/main.css','scripts/app.js'})
+        self.assertTrue(any('missing.css' in x['url'] for x in result['resources']['missing']))
+        self.assertTrue(any('example.com' in x['url'] for x in result['resources']['blocked']))
     def test_browser_dynamic_focus_and_fixture_partial_repair(self):
         source="<button id='a'>Open</button><button id='b'>Next</button><script>document.querySelector('#a').addEventListener('keydown',e=>{if(e.key==='ArrowDown')document.querySelector('#b').focus()})</script>"
         report=server.audit(source,'local',['Tab','ArrowDown'])

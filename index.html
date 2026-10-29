@@ -162,16 +162,16 @@
 
     <section class="local-workspace" aria-labelledby="local-heading" id="local-workspace">
       <div class="local-heading-row">
-        <div><p class="section-kicker"><span class="kicker-index">D</span> OPTIONAL · YOUR HTML</p><h2 id="local-heading">Inspect a trusted local file</h2><p class="local-lede">Choose a single HTML file and define the exact keyboard sequence to try. AccessPatch does not open a hosted page or scan your repository.</p></div>
+        <div><p class="section-kicker"><span class="kicker-index">D</span> OPTIONAL · YOUR LOCAL FILES</p><h2 id="local-heading">Inspect a trusted local page</h2><p class="local-lede">Choose one HTML file, an optional folder of relative CSS/JS files, and the keyboard sequence to try. AccessPatch does not open a hosted page or scan your repository.</p></div>
         <span class="local-only-badge"><span aria-hidden="true">⌂</span> LOCAL WORKFLOW</span>
       </div>
       <div class="local-disclosure" role="note">
         <span class="disclosure-icon" aria-hidden="true">!</span>
-        <p><strong>Only use HTML you trust.</strong> A fresh local Chromium context runs the original file and, when you verify, the proposed candidate. JavaScript can execute. HTTP and WebSocket requests are intercepted; downloads and service workers are blocked. This is not OS-level isolation or a network sandbox, and other browser network paths may remain. External assets and network-dependent behavior may not work.</p>
+        <p><strong>Only use files you trust.</strong> A fresh local Chromium context runs the selected HTML and included JavaScript, then the candidate when you verify. Selected CSS/JS contents are sent only to this local AccessPatch server for inspection and verification; model requests receive HTML only. Unselected and external HTTP resources are blocked, downloads and service workers are blocked, and HTTP/WebSocket requests are intercepted. The resource list covers intercepted HTTP requests only; other browser resource paths may not appear. This is not OS-level isolation or a network sandbox.</p>
       </div>
       <div class="local-grid">
         <div class="local-input-panel">
-          <div class="local-panel-title"><span class="local-step">01</span><div><h3>Choose file &amp; journey</h3><p>Single <code>.html</code> file · up to 500 KB</p></div></div>
+          <div class="local-panel-title"><span class="local-step">01</span><div><h3>Choose files &amp; journey</h3><p>One <code>.html</code> file · optional CSS/JS bundle</p></div></div>
           <label class="file-picker" for="html-file">
             <span class="file-picker-icon" aria-hidden="true">↑</span>
             <span><strong>Choose an HTML file</strong><small id="file-selection-status">File stays in this tab until you choose an action.</small></span>
@@ -179,6 +179,19 @@
           </label>
           <p id="file-help" class="field-help">The source is sent only to this local AccessPatch server when you request an action. It is never saved by this page.</p>
           <p id="file-error" class="field-error" role="status" hidden></p>
+
+          <div class="asset-picker-group">
+            <div class="asset-heading-row"><div><h4>Optional relative CSS/JS</h4><p>Choose only files needed by this HTML · up to 25 files / 1 MB</p></div><span id="asset-count" class="journey-count">0 files</span></div>
+            <label class="file-picker asset-folder-picker" for="asset-folder">
+              <span class="file-picker-icon asset-picker-icon" aria-hidden="true">＋</span>
+              <span><strong>Choose asset folder</strong><small id="asset-selection-status">No CSS/JS folder selected. This step is optional.</small></span>
+              <input id="asset-folder" type="file" webkitdirectory directory multiple accept=".css,.js,.mjs,text/css,text/javascript" aria-describedby="asset-help asset-error">
+            </label>
+            <p id="asset-help" class="field-help">Only UTF-8 .css, .js, and .mjs files are kept. The selected folder’s top-level name is removed; nested paths are matched from <code>/index.html</code>. Review every listed file before allowing local execution.</p>
+            <p id="asset-error" class="field-error" role="status" aria-live="polite" hidden></p>
+            <ul id="asset-list" class="asset-list" aria-label="Selected CSS and JavaScript files"></ul>
+            <button type="button" class="clear-assets-button" id="clear-assets-button" hidden>Clear selected assets</button>
+          </div>
 
           <div class="journey-editor">
             <div class="journey-title-row"><div><h4>Keyboard journey</h4><p>Choose 1–20 keys in the order to send.</p></div><span id="journey-count" class="journey-count">0 / 20</span></div>
@@ -189,8 +202,8 @@
           </div>
 
           <div class="consent-block">
-            <label class="consent-label"><input id="run-consent" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span><strong>Allow one local browser run</strong><small>I trust this HTML and consent to the next local action only. JavaScript can execute. I will confirm again before running a candidate. This is not OS-level isolation.</small></span></label>
-            <label class="consent-label model-consent-label"><input id="model-consent" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span><strong>Allow one model request to send source</strong><small>For a repair request, send up to 12,000 characters of this HTML to the configured NVIDIA Nemotron model via Nebius Token Factory. I have checked it for secrets or sensitive content. This is separate from local execution.</small></span></label>
+            <label class="consent-label"><input id="run-consent" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span><strong>Allow one local browser run</strong><small>I trust this HTML and every listed CSS/JS file. I consent to the next local action only; selected JavaScript can execute. I will confirm again before running a candidate. This is not OS-level isolation.</small></span></label>
+            <label class="consent-label model-consent-label"><input id="model-consent" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span><strong>Allow one model request to send HTML source</strong><small>Only when I request a proposal, send up to 24,000 characters / 96,000 UTF-8 bytes of this HTML to NVIDIA Nemotron via Nebius Token Factory. Selected CSS/JS files are not sent. I have checked the HTML for secrets or sensitive content. Verification does not send source to the model.</small></span></label>
           </div>
 
           <div class="local-actions">
@@ -209,14 +222,14 @@
             <div class="local-output-empty subdued-empty"><span aria-hidden="true">✳</span><strong>No model proposal</strong><p>The model only sees this file after you opt in and request a repair.</p></div>
           </div>
           <div id="local-verify-controls" class="local-verify-controls" hidden>
-            <div class="candidate-ready"><span class="candidate-check" aria-hidden="true">✓</span><div><strong>Candidate ready for review</strong><small>Review the full diff above. Verify runs both source versions with your keyboard journey.</small></div></div>
+            <div class="candidate-ready"><span class="candidate-check" aria-hidden="true">✓</span><div><strong>Candidate ready for review</strong><small>Review the full diff above. Verify runs both HTML versions with this keyboard journey and the same selected assets. The HTML download excludes CSS/JS files.</small></div></div>
             <button type="button" class="button button-dark button-full" id="verify-local-button" disabled><span aria-hidden="true">↹</span><span class="button-label">Verify candidate locally</span><span class="button-arrow" aria-hidden="true">→</span></button>
-            <div class="local-download-actions"><button type="button" class="download-button" id="download-candidate-button" hidden>Download verified candidate HTML</button><button type="button" class="download-button" id="download-report-button" hidden>Download evidence report (JSON)</button></div>
+            <div class="local-download-actions"><button type="button" class="download-button" id="download-candidate-button" hidden>Download verified candidate HTML only</button><button type="button" class="download-button" id="download-report-button" hidden>Download evidence report (JSON)</button></div>
           </div>
           <div id="local-verify-output" class="local-output-block local-verify-output" hidden></div>
         </div>
       </div>
-      <div class="local-limitations"><span class="limits-icon" aria-hidden="true">i</span><div><strong>Scope limits</strong><p>One HTML file only. Model proposals can add limited attributes or replace a simple text-only div with a button; they cannot repair a whole site. Dynamic pages, iframes, external assets, network-dependent behavior, and full site accessibility are outside this run. Browser observations are evidence for your selected journey, not a compliance claim.</p></div></div>
+      <div class="local-limitations"><span class="limits-icon" aria-hidden="true">i</span><div><strong>Scope limits</strong><p>One HTML file and up to 25 explicitly selected CSS/JS files (1 MB total). Other resource types and external files may be missing or blocked; check the per-run resource report. Model proposals see HTML only and can add limited attributes or replace a simple text-only div with a button. Dynamic pages, iframes, full site accessibility, and deployed behavior are outside this run. Observations are evidence for the selected journey, not a compliance claim.</p></div></div>
     </section>
 
     <footer class="page-footer"><span class="footer-brand">ACCESS<span>PATCH</span></span><span>Human-reviewed repairs · observed keyboard journeys</span><a href="#main">Back to top ↑</a></footer>

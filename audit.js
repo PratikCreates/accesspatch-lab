@@ -7,7 +7,29 @@ const fs = require('fs');
   const browser = await chromium.launch(options);
   try {
     const context = await browser.newContext({javaScriptEnabled:input.mode === 'local', serviceWorkers:'block', acceptDownloads:false});
-    await context.route('**/*', route => route.abort());
+    const resources = {loaded:[], missing:[], blocked:[], truncated:false};
+    const assets = new Map((input.assets || []).map(asset => [asset.path, asset.content]));
+    const origin = 'http://accesspatch.invalid';
+    const record = (kind, entry) => {
+      if (resources.loaded.length + resources.missing.length + resources.blocked.length < 200) resources[kind].push(entry);
+      else resources.truncated = true;
+    };
+    await context.route('**/*', async route => {
+      const raw = route.request().url();
+      let url;
+      try { url = new URL(raw); } catch { record('blocked',{url:raw.slice(0,500)}); return route.abort(); }
+      if (input.mode === 'local' && url.origin === origin && route.request().method() === 'GET') {
+        let path;
+        try { path=decodeURIComponent(url.pathname.slice(1)); } catch { record('blocked',{url:raw.slice(0,500)}); return route.abort(); }
+        if (path === 'index.html') return route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:input.source});
+        if (assets.has(path)) {
+          record('loaded',{url:raw.slice(0,500),path});
+          return route.fulfill({status:200,contentType:/\.css$/i.test(path) ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8',body:assets.get(path)});
+        }
+        record('missing',{url:raw.slice(0,500)});return route.abort();
+      }
+      record('blocked',{url:raw.slice(0,500)});return route.abort();
+    });
     if (typeof context.routeWebSocket !== 'function') throw new Error('This Playwright version cannot intercept WebSockets; refusing to run the page.');
     await context.routeWebSocket('**/*', socket => socket.close());
     // Defense in depth only: browser JavaScript is not a security boundary.
@@ -18,7 +40,8 @@ const fs = require('fs');
       }
     });
     const page = await context.newPage();
-    await page.setContent(input.source, {waitUntil:'load', timeout:10000});
+    if (input.mode === 'local') await page.goto(origin + '/index.html', {waitUntil:'load', timeout:10000});
+    else await page.setContent(input.source, {waitUntil:'load', timeout:10000});
     if (input.mode === 'local') {
       const checks = await page.evaluate(() => {
         const images = [...document.querySelectorAll('img')];
@@ -37,7 +60,7 @@ const fs = require('fs');
         keyboard.push({step:index+1,key,...active,source:'browser'});
       }
       const passed=checks.filter(x=>x.status==='pass').length;
-      process.stdout.write(JSON.stringify({checks,keyboard,summary:{passed,total:checks.length}})); return;
+      process.stdout.write(JSON.stringify({checks,keyboard,summary:{passed,total:checks.length},resources})); return;
     }
     const checks = await page.evaluate(() => {
       const image = document.querySelector('#garden-image');
